@@ -95,10 +95,26 @@
       </section>
       <template v-if="tickers.length">
         <hr class="w-full border-t border-gray-600 my-4" />
+        <button
+          class="mx-2 my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          v-if="page > 1"
+          @click="page--"
+        >
+          Назад
+        </button>
+        <button
+          class="mx-2 my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          v-if="hasNextPage"
+          @click="page++"
+        >
+          Вперёд
+        </button>
+        <div>Фильтер: <input v-model="filter" /></div>
+        <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-            v-for="t in tickers"
+            v-for="t in filtredTickers()"
             :key="t.name"
             @click="select(t)"
             :class="{
@@ -188,11 +204,26 @@ export default {
       ticker: null,
       tickers: [],
       sel: null,
-      graph: []
+      graph: [],
+      page: 1,
+      filter: "",
+      hasNextPage: true
     };
   },
 
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
+
     const tickersData = localStorage.getItem("criptonomicon-list");
 
     if (tickersData) {
@@ -215,9 +246,22 @@ export default {
         if (this.sel?.name === tickerName) {
           this.graph.push(data.USD);
         }
-      }, 3000);
+      }, 5000);
 
       this.ticker = "";
+    },
+
+    filtredTickers() {
+      const start = (this.page - 1) * 6;
+      const end = this.page * 6;
+
+      const filtredTickers = this.tickers.filter(ticker =>
+        ticker.name.includes(this.filter)
+      );
+
+      this.hasNextPage = filtredTickers.length > end;
+
+      return filtredTickers.slice(start, end);
     },
 
     add() {
@@ -227,6 +271,10 @@ export default {
       };
 
       this.tickers.push(currentTicker);
+
+      localStorage.setItem("criptonomicon-list", JSON.stringify(this.tickers));
+
+      this.filter = "";
 
       localStorage.setItem("criptonomicon-list", JSON.stringify(this.tickers));
 
@@ -248,6 +296,26 @@ export default {
       const minValue = Math.min(...this.graph);
       return this.graph.map(
         price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    }
+  },
+
+  watch: {
+    filter() {
+      this.page = 1;
+
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
       );
     }
   }
